@@ -1,4 +1,4 @@
-import { ColorPropType, StyleSheet, TouchableHighlight, Text } from 'react-native';
+import { ColorPropType, StyleSheet, TouchableHighlight, Text, View } from 'react-native';
 import React, { Component } from 'react';
 import { bool, func, string } from 'prop-types';
 
@@ -29,11 +29,11 @@ export default class Button extends Component<*> {
     } = this.props;
 
     return (
-      <TouchableHighlight
+      <View
         accessibilityLabel={accessibilityLabel}
         accessibilityRole="button"
         disabled={disabled}
-        onPress={onPress}
+        onClick={onPress}
         style={[
           styles.button,
           style,
@@ -43,7 +43,7 @@ export default class Button extends Component<*> {
         testID={testID}
       >
         <Text style={[styles.text, textStyle, disabled && styles.textDisabled]}>{title}</Text>
-      </TouchableHighlight>
+      </View>
     );
   }
 }

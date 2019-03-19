@@ -8,19 +8,71 @@
  * @flow
  */
 
-import applyLayout from '../../modules/applyLayout';
-import applyNativeMethods from '../../modules/applyNativeMethods';
-import { bool } from 'prop-types';
+import type { ViewProps } from './ViewPropTypes';
+
+import React, { useContext, useRef } from 'react';
+import StyleSheet from '../StyleSheet';
+//import TextAncestor from '../Text/TextAncestor';
 import createElement from '../createElement';
 import css from '../StyleSheet/css';
 import filterSupportedProps from './filterSupportedProps';
 import invariant from 'fbjs/lib/invariant';
+import setAndForwardRef from '../../modules/setAndForwardRef';
+import usePlatformMethods from '../../hooks/usePlatformMethods';
+import useResizeObserver from '../../hooks/useResizeObserver';
 import warning from 'fbjs/lib/warning';
-import StyleSheet from '../StyleSheet';
-import ViewPropTypes, { type ViewProps } from './ViewPropTypes';
-import React, { Component } from 'react';
 
-const calculateHitSlopStyle = hitSlop => {
+import ViewPropTypes from './ViewPropTypes';
+
+const View = React.forwardRef((props: ViewProps, ref) => {
+  const { forwardedRef, hitSlop, onLayout, style, ...rest } = props;
+
+  const localRef = useRef(null);
+  //const hasTextAncestor = useContext(TextAncestor);
+
+  const setRef = setAndForwardRef({
+    getForwardedRef: () => forwardedRef,
+    setLocalRef: c => {
+      localRef.current = c;
+    }
+  });
+
+  if (process.env.NODE_ENV !== 'production') {
+    warning(this.props.className == null, 'Using the "className" prop on <View> is deprecated.');
+
+    React.Children.toArray(this.props.children).forEach(item => {
+      invariant(
+        typeof item !== 'string',
+        `Unexpected text node: ${item}. A text node cannot be a child of a <View>.`
+      );
+    });
+  }
+
+  const classList = [props.className, classes.view];
+
+  const supportedProps = filterSupportedProps(rest);
+  supportedProps.children = hitSlop
+    ? React.Children.toArray([createHitSlopElement(hitSlop), props.children])
+    : props.children;
+  supportedProps.classList = classList;
+  supportedProps.ref = setRef;
+  supportedProps.style = StyleSheet.compose(
+    //hasTextAncestor && styles.inline,
+    style
+  );
+
+  useResizeObserver(localRef, onLayout);
+  usePlatformMethods(localRef, ref, classList, style);
+
+  return createElement('div', supportedProps);
+});
+
+View.displayName = 'View';
+View.propTypes = ViewPropTypes;
+
+export default View;
+
+function calculateHitSlopStyle(hitSlop) {
   const hitStyle = {};
   for (const prop in hitSlop) {
     if (hitSlop.hasOwnProperty(prop)) {
@@ -29,51 +81,14 @@ const calculateHitSlopStyle = hitSlop => {
     }
   }
   return hitStyle;
-};
+}
 
-class View extends Component<ViewProps> {
-  static displayName = 'View';
-
-  static contextTypes = {
-    isInAParentText: bool
-  };
-
-  static propTypes = ViewPropTypes;
-
-  render() {
-    const hitSlop = this.props.hitSlop;
-    const supportedProps = filterSupportedProps(this.props);
-
-    if (process.env.NODE_ENV !== 'production') {
-      warning(this.props.className == null, 'Using the "className" prop on <View> is deprecated.');
-
-      React.Children.toArray(this.props.children).forEach(item => {
-        invariant(
-          typeof item !== 'string',
-          `Unexpected text node: ${item}. A text node cannot be a child of a <View>.`
-        );
-      });
-    }
-
-    const { isInAParentText } = this.context;
-
-    supportedProps.classList = [this.props.className, classes.view];
-    supportedProps.style = StyleSheet.compose(
-      isInAParentText && styles.inline,
-      this.props.style
-    );
-
-    if (hitSlop) {
-      const hitSlopStyle = calculateHitSlopStyle(hitSlop);
-      const hitSlopChild = createElement('span', {
-        classList: [classes.hitSlop],
-        style: hitSlopStyle
-      });
-      supportedProps.children = React.Children.toArray([hitSlopChild, supportedProps.children]);
-    }
-
-    return createElement('div', supportedProps);
-  }
+function createHitSlopElement(hitSlop) {
+  const hitSlopStyle = calculateHitSlopStyle(hitSlop);
+  return createElement('span', {
+    classList: [classes.hitSlop],
+    style: hitSlopStyle
+  });
 }
 
 const classes = css.create({
@@ -109,5 +124,3 @@ const styles = StyleSheet.create({
     display: 'inline-flex'
   }
 });
-
-export default applyLayout(applyNativeMethods(View));
